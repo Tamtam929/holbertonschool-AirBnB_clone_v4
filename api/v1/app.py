@@ -1,39 +1,49 @@
 #!/usr/bin/python3
-""" instance of Flask """
-from flask import Flask, make_response
-from flask_cors import CORS
+""" Flask Application """
 from models import storage
 from api.v1.views import app_views
-from os import getenv as env
+from os import environ
+from flask import Flask, render_template, make_response, jsonify
+from flask_cors import CORS
+from flasgger import Swagger
+from flasgger.utils import swag_from
 
-
-# create an instance of Flask
 app = Flask(__name__)
-CORS(app, resources={"/*": {"origins": "0.0.0.0"}})
-# register blueprint
+app.config['JSONIFY_PRETTYPRINT_REGULAR'] = True
 app.register_blueprint(app_views)
-
-
-@app.errorhandler(404)
-def handle_404(exception):
-    """handles 404 scenario (page not found)"""
-    code = exception.__str__().split()[0]
-    message = {"error": "Not found"}
-    return make_response(message, code)
+CORS(app, resources={r"/api/v1/*": {"origins": "*"}})
 
 
 @app.teardown_appcontext
-def teardown_db(exception):
-    """ close storage """
+def close_db(error):
+    """ Close Storage """
     storage.close()
 
 
-def start_flask():
-    """ start flask """
-    app.run(host=env('HBNB_API_HOST'),
-            port=env('HBNB_API_PORT'),
-            threaded=True)
+@app.errorhandler(404)
+def not_found(error):
+    """ 404 Error
+    ---
+    responses:
+      404:
+        description: a resource was not found
+    """
+    return make_response(jsonify({'error': "Not found"}), 404)
+
+app.config['SWAGGER'] = {
+    'title': 'AirBnB clone Restful API',
+    'uiversion': 3
+}
+
+Swagger(app)
 
 
 if __name__ == "__main__":
-    start_flask()
+    """ Main Function """
+    host = environ.get('HBNB_API_HOST')
+    port = environ.get('HBNB_API_PORT')
+    if not host:
+        host = '0.0.0.0'
+    if not port:
+        port = '5000'
+    app.run(host=host, port=port, threaded=True)
